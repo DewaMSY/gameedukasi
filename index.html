@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main Bareng Pak Dewa - Game Edukasi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            touch-action: manipulation; /* Disable double-tap to zoom */
+        }
+        .hidden { display: none; }
+        .keyboard-btn { transition: all 0.2s ease; }
+        .keyboard-btn:hover { transform: scale(1.1); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+        #hangman-svg .figure-part {
+            stroke: #334155; stroke-width: 4px; fill: transparent; stroke-linecap: round;
+        }
+        /* Styles for Word Search Grid */
+        #wordSearchGrid {
+            display: grid;
+            user-select: none;
+        }
+        .grid-cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .grid-cell.selected { background-color: #fde047; /* yellow-300 */ }
+        .grid-cell.found { background-color: #4ade80; /* green-400 */ color: white; }
+        #wordSearchList li.found {
+            text-decoration: line-through;
+            color: #64748b; /* slate-500 */
+        }
+    </style>
+</head>
+<body class="bg-sky-100 text-slate-800">
+
+    <!-- Container Utama -->
+    <div class="container mx-auto p-4 min-h-screen flex flex-col items-center justify-center">
+
+        <!-- 1. Landing Page -->
+        <div id="landingPage" class="w-full max-w-4xl text-center">
+            <header class="mb-12">
+                <h1 class="text-5xl md:text-6xl font-bold text-sky-600">Main Bareng Pak Dewa</h1>
+                <p class="text-slate-600 mt-2 text-lg">Main Game Seru Sama-Sama</p>
+            </header>
+            <main>
+                <h2 class="text-3xl font-semibold mb-8">Ayo, Pilih Permainanmu!</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Card Hangman -->
+                    <div class="bg-white p-6 rounded-2xl shadow-lg card-hover cursor-pointer" onclick="showPage('setupPageHangman')">
+                        <div class="text-6xl mb-4">🤔</div>
+                        <h3 class="text-2xl font-bold text-yellow-500 mb-2">Hangman Kata</h3>
+                        <p class="text-slate-500">Tebak kata misteri huruf demi huruf. Buat soalmu sendiri!</p>
+                    </div>
+                    <!-- Card Cari Kata -->
+                    <div class="bg-white p-6 rounded-2xl shadow-lg card-hover cursor-pointer" onclick="showPage('setupPageCariKata')">
+                         <div class="text-6xl mb-4">🔎</div>
+                        <h3 class="text-2xl font-bold text-teal-500 mb-2">Cari Kata</h3>
+                        <p class="text-slate-500">Temukan kata-kata tersembunyi di papan huruf!</p>
+                    </div>
+                    <!-- Card Acak Kata -->
+                    <div class="bg-white p-6 rounded-2xl shadow-lg card-hover cursor-pointer" onclick="showPage('setupPageAcakKata')">
+                        <div class="text-6xl mb-4">🔄</div>
+                        <h3 class="text-2xl font-bold text-indigo-500 mb-2">Acak Kata</h3>
+                        <p class="text-slate-500">Susun kembali huruf yang berantakan menjadi kata!</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- 2. Halaman Setup (Shared structure) -->
+        <!-- Setup Hangman -->
+        <div id="setupPageHangman" class="page hidden w-full max-w-2xl text-center">
+            <h1 class="text-4xl font-bold text-sky-600 mb-4">Setup Hangman</h1>
+            <p class="text-slate-600 mb-6">Masukkan kata, pisahkan dengan koma (,) atau Enter.</p>
+            <textarea id="wordInputHangman" class="word-input w-full h-48 p-4 border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-yellow-500 transition" placeholder="Contoh: matahari, pelangi, sekolah"></textarea>
+            <button class="start-game-btn mt-6 bg-yellow-500 text-white font-bold py-3 px-8 rounded-full text-xl hover:bg-yellow-600 transition-transform hover:scale-105 shadow-lg disabled:opacity-50" data-game="Hangman" disabled>Mainkan!</button>
+            <button class="back-btn mt-4 text-slate-500 hover:text-sky-600" onclick="showPage('landingPage')">Kembali</button>
+        </div>
+        <!-- Setup Cari Kata -->
+        <div id="setupPageCariKata" class="page hidden w-full max-w-2xl text-center">
+            <h1 class="text-4xl font-bold text-sky-600 mb-4">Setup Cari Kata</h1>
+            <p class="text-slate-600 mb-6">Masukkan kata, pisahkan dengan koma (,) atau Enter.</p>
+            <textarea id="wordInputCariKata" class="word-input w-full h-48 p-4 border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 transition" placeholder="Masukkan 3-10 kata"></textarea>
+            <div class="mt-4">
+                <label for="gridSize" class="font-semibold">Ukuran Papan:</label>
+                <select id="gridSize" class="ml-2 p-2 rounded-lg border-2 border-slate-300 focus:ring-2 focus:ring-teal-500">
+                    <option value="10">10x10 (Mudah)</option>
+                    <option value="12" selected>12x12 (Normal)</option>
+                    <option value="15">15x15 (Sulit)</option>
+                </select>
+            </div>
+            <button class="start-game-btn mt-6 bg-teal-500 text-white font-bold py-3 px-8 rounded-full text-xl hover:bg-teal-600 transition-transform hover:scale-105 shadow-lg disabled:opacity-50" data-game="CariKata" disabled>Mainkan!</button>
+            <button class="back-btn mt-4 text-slate-500 hover:text-sky-600" onclick="showPage('landingPage')">Kembali</button>
+        </div>
+        <!-- Setup Acak Kata -->
+        <div id="setupPageAcakKata" class="page hidden w-full max-w-2xl text-center">
+            <h1 class="text-4xl font-bold text-sky-600 mb-4">Setup Acak Kata</h1>
+            <p class="text-slate-600 mb-6">Masukkan kata, pisahkan dengan koma (,) atau Enter.</p>
+            <textarea id="wordInputAcakKata" class="word-input w-full h-48 p-4 border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 transition" placeholder="Contoh: komputer, belajar, pintar"></textarea>
+            <button class="start-game-btn mt-6 bg-indigo-500 text-white font-bold py-3 px-8 rounded-full text-xl hover:bg-indigo-600 transition-transform hover:scale-105 shadow-lg disabled:opacity-50" data-game="AcakKata" disabled>Mainkan!</button>
+            <button class="back-btn mt-4 text-slate-500 hover:text-sky-600" onclick="showPage('landingPage')">Kembali</button>
+        </div>
+
+        <!-- 3. Halaman Game -->
+        <!-- Game Hangman -->
+        <div id="gamePageHangman" class="page hidden w-full max-w-4xl text-center">
+            <!-- Header Info Game -->
+            <div class="flex justify-between items-center mb-4 text-lg font-semibold">
+                <div id="scoreDisplayHangman" class="bg-green-200 text-green-800 px-4 py-1 rounded-full">Skor: 0</div>
+                <div id="wordCounterHangman" class="text-slate-600">Kata 1 dari 5</div>
+                <div id="livesDisplayHangman" class="bg-red-200 text-red-800 px-4 py-1 rounded-full flex items-center gap-1">❤️ <span id="livesCountHangman">6</span></div>
+            </div>
+            <!-- Area Visual & Kata -->
+            <div class="bg-white rounded-2xl shadow-lg p-4 md:p-8 mb-6 flex flex-col md:flex-row items-center justify-around gap-6">
+                <!-- Gambar Hangman -->
+                <div class="w-48 h-56 md:w-64 md:h-72">
+                     <svg id="hangman-svg" viewBox="0 0 200 250" class="w-full h-full">
+                        <line x1="20" y1="230" x2="100" y2="230" class="figure-part" /><line x1="60" y1="230" x2="60" y2="20" class="figure-part" /><line x1="60" y1="20" x2="150" y2="20" class="figure-part" /><line x1="150" y1="20" x2="150" y2="50" class="figure-part" />
+                        <circle cx="150" cy="70" r="20" class="figure-part hidden" id="hangman-head" /><line x1="150" y1="90" x2="150" y2="150" class="figure-part hidden" id="hangman-body" /><line x1="150" y1="110" x2="120" y2="130" class="figure-part hidden" id="hangman-left-arm" /><line x1="150" y1="110" x2="180" y2="130" class="figure-part hidden" id="hangman-right-arm" /><line x1="150" y1="150" x2="120" y2="180" class="figure-part hidden" id="hangman-left-leg" /><line x1="150" y1="150" x2="180" y2="180" class="figure-part hidden" id="hangman-right-leg" />
+                    </svg>
+                </div>
+                <!-- Tempat Kata -->
+                <div id="wordDisplayHangman" class="flex flex-wrap justify-center gap-2 md:gap-3"></div>
+            </div>
+            <!-- Keyboard Virtual -->
+            <div id="keyboardHangman" class="grid grid-cols-7 sm:grid-cols-9 md:grid-cols-10 gap-2 w-full max-w-2xl mx-auto"></div>
+        </div>
+        <!-- Game Cari Kata -->
+        <div id="gamePageCariKata" class="page hidden w-full max-w-4xl text-center">
+            <div class="flex justify-between items-center mb-4 text-lg font-semibold">
+                <div id="wordsFoundCariKata" class="bg-green-200 text-green-800 px-4 py-1 rounded-full">Ditemukan: 0 / 0</div>
+                <button class="back-btn bg-yellow-500 text-white px-4 py-1 rounded-full hover:bg-yellow-600" onclick="showPage('landingPage')">Keluar</button>
+            </div>
+            <div class="bg-white rounded-2xl shadow-lg p-4 md:p-6 flex flex-col lg:flex-row gap-6">
+                <div id="wordSearchGrid" class="aspect-square w-full lg:w-2/3 bg-slate-100 rounded-lg p-2"></div>
+                <div class="w-full lg:w-1/3">
+                    <h3 class="text-xl font-bold mb-2 text-teal-600">Cari Kata Ini:</h3>
+                    <ul id="wordSearchList" class="space-y-1 text-lg font-semibold text-slate-700"></ul>
+                </div>
+            </div>
+        </div>
+        <!-- Game Acak Kata -->
+        <div id="gamePageAcakKata" class="page hidden w-full max-w-2xl text-center">
+             <div class="flex justify-between items-center mb-4 text-lg font-semibold">
+                <div id="scoreDisplayAcakKata" class="bg-green-200 text-green-800 px-4 py-1 rounded-full">Skor: 0</div>
+                <div id="wordCounterAcakKata" class="text-slate-600">Kata 1 dari 5</div>
+                 <button class="back-btn bg-yellow-500 text-white px-4 py-1 rounded-full hover:bg-yellow-600" onclick="showPage('landingPage')">Keluar</button>
+            </div>
+            <div class="bg-white rounded-2xl shadow-lg p-8">
+                <h2 class="text-2xl text-slate-600 mb-4">Susun huruf ini menjadi kata!</h2>
+                <div id="scrambledWordDisplay" class="text-5xl font-bold tracking-widest text-indigo-600 mb-6 bg-indigo-100 p-4 rounded-lg">A K C A</div>
+                <input type="text" id="guessInputAcakKata" class="w-full text-center text-2xl p-3 border-2 border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500" placeholder="Ketik jawabanmu...">
+                <div class="mt-6 flex justify-center gap-4">
+                    <button id="checkGuessBtnAcakKata" class="bg-indigo-500 text-white font-bold py-3 px-8 rounded-full text-lg hover:bg-indigo-600">Periksa</button>
+                    <button id="skipBtnAcakKata" class="bg-slate-400 text-white font-bold py-3 px-8 rounded-full text-lg hover:bg-slate-500">Lewati</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal Notifikasi (Universal) -->
+        <div id="notificationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div id="modalContent" class="bg-white rounded-2xl shadow-xl p-8 text-center max-w-sm w-full transform transition-all scale-95 opacity-0">
+                <h2 id="modalTitle" class="text-3xl font-bold mb-4">Hebat!</h2>
+                <p id="modalMessage" class="text-slate-600 mb-6">Kata berhasil ditebak!</p>
+                <button id="modalButton" class="bg-sky-500 text-white font-bold py-3 px-8 rounded-full text-lg hover:bg-sky-600 transition-transform hover:scale-105">Lanjut</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Universal Elements
+        const pages = document.querySelectorAll('.page');
+        const wordInputs = document.querySelectorAll('.word-input');
+        const startGameBtns = document.querySelectorAll('.start-game-btn');
+        const notificationModal = document.getElementById('notificationModal');
+        const modalContent = document.getElementById('modalContent');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalButton = document.getElementById('modalButton');
+        const synth = new Tone.PolySynth().toDestination();
+        
+        // --- UNIVERSAL FUNCTIONS ---
+        function showPage(pageId) {
+            pages.forEach(p => p.classList.add('hidden'));
+            document.getElementById('landingPage').classList.add('hidden');
+            document.getElementById(pageId).classList.remove('hidden');
+        }
+
+        const playSound = (note, duration) => {
+             if (Tone.context.state !== 'running') Tone.start();
+            synth.triggerAttackRelease(note, duration);
+        }
+        const correctSound = () => playSound("C5", "8n");
+        const wrongSound = () => playSound("C3", "8n");
+        const winSound = () => { 
+            if (Tone.context.state !== 'running') Tone.start();
+            const now = Tone.now();
+            synth.triggerAttackRelease("C5", "8n", now);
+            synth.triggerAttackRelease("E5", "8n", now + 0.12);
+            synth.triggerAttackRelease("G5", "8n", now + 0.24);
+        };
+        const loseSound = () => { 
+            if (Tone.context.state !== 'running') Tone.start();
+            const now = Tone.now();
+            synth.triggerAttackRelease("G3", "8n", now);
+            synth.triggerAttackRelease("E3", "8n", now + 0.12);
+            synth.triggerAttackRelease("C3", "8n", now + 0.24);
+        };
+        const clickSound = () => playSound("C4", "16n");
+
+        function showNotification(isWin, message, buttonText, callback) {
+            modalTitle.textContent = isWin ? 'Hebat!' : (message.includes('kalah') || message.includes('gagal')) ? 'Oh Tidak!' : 'Info';
+            modalMessage.innerHTML = message;
+            modalButton.textContent = buttonText;
+            
+            modalTitle.className = "text-3xl font-bold mb-4"; // Reset classes
+            modalButton.className = "bg-sky-500 text-white font-bold py-3 px-8 rounded-full text-lg hover:bg-sky-600 transition-transform hover:scale-105";
+
+            if (isWin) modalTitle.classList.add('text-green-500');
+            else modalTitle.classList.add('text-red-500');
+
+            notificationModal.classList.remove('hidden');
+            setTimeout(() => modalContent.classList.remove('scale-95', 'opacity-0'), 50);
+
+            modalButton.onclick = () => {
+                modalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    notificationModal.classList.add('hidden');
+                    if (callback) callback();
+                }, 200);
+            };
+        }
+
+        wordInputs.forEach(input => {
+            input.addEventListener('input', (e) => {
+                const gameType = e.target.id.replace('wordInput', '');
+                const btn = document.querySelector(`.start-game-btn[data-game="${gameType}"]`);
+                btn.disabled = e.target.value.trim() === '';
+            });
+        });
+
+        startGameBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const game = btn.dataset.game;
+                if (game === 'Hangman') startHangman();
+                if (game === 'CariKata') startCariKata();
+                if (game === 'AcakKata') startAcakKata();
+            });
+        });
+
+        // --- HANGMAN GAME LOGIC ---
+        const hangmanState = {
+            words: [], currentWordIndex: 0, currentWord: '', guessedLetters: [], wrongGuesses: 0, score: 0, maxWrongGuesses: 6,
+            scoreDisplay: document.getElementById('scoreDisplayHangman'),
+            wordCounter: document.getElementById('wordCounterHangman'),
+            livesCount: document.getElementById('livesCountHangman'),
+            wordDisplay: document.getElementById('wordDisplayHangman'),
+            keyboard: document.getElementById('keyboardHangman'),
+            hangmanParts: document.querySelectorAll('#hangman-svg .figure-part')
+        };
+        
+        function startHangman() {
+            const rawWords = document.getElementById('wordInputHangman').value.split(/[\n,]/).map(w => w.trim().toUpperCase()).filter(w => w.length > 0 && /^[A-Z]+$/.test(w));
+            if (rawWords.length === 0) return;
+            Object.assign(hangmanState, { words: rawWords, currentWordIndex: 0, score: 0 });
+            showPage('gamePageHangman');
+            startNewRoundHangman();
+        }
+
+        function startNewRoundHangman() {
+            Object.assign(hangmanState, { wrongGuesses: 0, guessedLetters: [], currentWord: hangmanState.words[hangmanState.currentWordIndex] });
+            updateGameInfoHangman();
+            renderWordDisplayHangman();
+            renderKeyboardHangman();
+            resetHangmanVisual();
+        }
+
+        function updateGameInfoHangman() {
+            hangmanState.scoreDisplay.textContent = `Skor: ${hangmanState.score}`;
+            hangmanState.wordCounter.textContent = `Kata ${hangmanState.currentWordIndex + 1} dari ${hangmanState.words.length}`;
+            hangmanState.livesCount.textContent = hangmanState.maxWrongGuesses - hangmanState.wrongGuesses;
+        }
+        
+        function renderWordDisplayHangman() {
+            hangmanState.wordDisplay.innerHTML = hangmanState.currentWord.split('').map(letter => `<span class="w-10 h-12 md:w-12 md:h-14 border-b-4 border-slate-400 flex items-center justify-center text-3xl md:text-4xl font-bold">${hangmanState.guessedLetters.includes(letter) ? letter : ''}</span>`).join('');
+        }
+
+        function renderKeyboardHangman() {
+            hangmanState.keyboard.innerHTML = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => `<button class="keyboard-btn p-2 text-lg md:text-xl font-bold bg-sky-200 rounded-lg hover:bg-sky-300 disabled:opacity-30 disabled:hover:bg-sky-200" onclick="handleGuessHangman('${letter}')" data-key="${letter}">${letter}</button>`).join('');
+        }
+
+        function handleGuessHangman(letter) {
+            if (hangmanState.guessedLetters.includes(letter)) return;
+            hangmanState.guessedLetters.push(letter);
+            const keyBtn = hangmanState.keyboard.querySelector(`[data-key="${letter}"]`);
+            keyBtn.disabled = true;
+
+            if (hangmanState.currentWord.includes(letter)) {
+                correctSound();
+                keyBtn.classList.add('bg-green-400', 'text-white');
+            } else {
+                wrongSound();
+                hangmanState.wrongGuesses++;
+                keyBtn.classList.add('bg-red-400', 'text-white');
+                updateHangmanVisual();
+            }
+            renderWordDisplayHangman();
+            updateGameInfoHangman();
+            checkGameStateHangman();
+        }
+
+        function resetHangmanVisual() {
+            for (let i = 4; i < hangmanState.hangmanParts.length; i++) hangmanState.hangmanParts[i].classList.add('hidden');
+        }
+
+        function updateHangmanVisual() {
+            const bodyPartIndex = hangmanState.wrongGuesses + 3;
+            if(bodyPartIndex < hangmanState.hangmanParts.length) hangmanState.hangmanParts[bodyPartIndex].classList.remove('hidden');
+        }
+
+        function checkGameStateHangman() {
+            const isWordGuessed = hangmanState.currentWord.split('').every(l => hangmanState.guessedLetters.includes(l));
+            if (isWordGuessed) {
+                winSound();
+                hangmanState.score += 10;
+                updateGameInfoHangman();
+                const isLastWord = hangmanState.currentWordIndex >= hangmanState.words.length - 1;
+                showNotification(true, isLastWord ? `Selamat! Kamu menyelesaikan semua kata dengan skor ${hangmanState.score}!` : 'Kata berhasil ditebak!', isLastWord ? 'Main Lagi' : 'Lanjut', () => {
+                    if (isLastWord) showPage('setupPageHangman'); else { hangmanState.currentWordIndex++; startNewRoundHangman(); }
+                });
+            } else if (hangmanState.wrongGuesses >= hangmanState.maxWrongGuesses) {
+                loseSound();
+                showNotification(false, `Kamu kalah! Kata yang benar: ${hangmanState.currentWord}`, 'Coba Lagi', () => showPage('setupPageHangman'));
+            }
+        }
+
+        // --- CARI KATA GAME LOGIC ---
+        const cariKataState = {
+            grid: [], words: [], foundWords: [], size: 0,
+            isSelecting: false, selectedCells: [],
+            gridEl: document.getElementById('wordSearchGrid'),
+            listEl: document.getElementById('wordSearchList'),
+            counterEl: document.getElementById('wordsFoundCariKata'),
+        };
+
+        function startCariKata() {
+            const rawWords = document.getElementById('wordInputCariKata').value.split(/[\n,]/).map(w => w.trim().toUpperCase()).filter(w => w.length > 0 && /^[A-Z]+$/.test(w));
+            const size = parseInt(document.getElementById('gridSize').value);
+            if (rawWords.length === 0) return;
+            
+            Object.assign(cariKataState, { words: rawWords.sort((a,b) => b.length - a.length), foundWords: [], size });
+            
+            if (!generateGridCariKata()) {
+                showNotification(false, "Gagal menempatkan kata di papan. Coba kurangi kata atau perbesar papan.", "Kembali", () => showPage('setupPageCariKata'));
+                return;
+            }
+
+            renderGridCariKata();
+            renderWordListCariKata();
+            updateFoundCounterCariKata();
+            showPage('gamePageCariKata');
+        }
+        
+        function generateGridCariKata() {
+            let { grid, words, size } = cariKataState;
+            grid = Array(size).fill(null).map(() => Array(size).fill(null));
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1], [0, -1], [-1, 0], [-1, -1], [-1, 1]];
+            
+            for (const word of words) {
+                let placed = false;
+                let attempts = 0;
+                while (!placed && attempts < 100) {
+                    const dir = directions[Math.floor(Math.random() * directions.length)];
+                    const row = Math.floor(Math.random() * size);
+                    const col = Math.floor(Math.random() * size);
+                    
+                    let r = row, c = col;
+                    let canPlace = true;
+                    for (let i = 0; i < word.length; i++) {
+                        if (r < 0 || r >= size || c < 0 || c >= size || (grid[r][c] && grid[r][c] !== word[i])) {
+                            canPlace = false;
+                            break;
+                        }
+                        r += dir[0]; c += dir[1];
+                    }
+
+                    if (canPlace) {
+                        r = row; c = col;
+                        for (let i = 0; i < word.length; i++) {
+                            grid[r][c] = word[i];
+                            r += dir[0]; c += dir[1];
+                        }
+                        placed = true;
+                    }
+                    attempts++;
+                }
+                if (!placed) return false; // Failed to place a word
+            }
+            
+            // Fill empty cells
+            const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            for(let r=0; r<size; r++) for(let c=0; c<size; c++) if(!grid[r][c]) grid[r][c] = alphabet[Math.floor(Math.random() * alphabet.length)];
+            
+            cariKataState.grid = grid;
+            return true;
+        }
+
+        function renderGridCariKata() {
+            const { grid, size, gridEl } = cariKataState;
+            gridEl.innerHTML = '';
+            gridEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell text-lg md:text-2xl aspect-square';
+                    cell.textContent = grid[r][c];
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    gridEl.appendChild(cell);
+                }
+            }
+            addGridListenersCariKata();
+        }
+
+        function renderWordListCariKata() {
+            cariKataState.listEl.innerHTML = cariKataState.words.map(w => `<li data-word="${w}">${w}</li>`).join('');
+        }
+
+        function updateFoundCounterCariKata() {
+            cariKataState.counterEl.textContent = `Ditemukan: ${cariKataState.foundWords.length} / ${cariKataState.words.length}`;
+        }
+        
+        function addGridListenersCariKata() {
+            const { gridEl } = cariKataState;
+            gridEl.addEventListener('mousedown', startSelectionCariKata);
+            gridEl.addEventListener('mouseover', moveSelectionCariKata);
+            document.addEventListener('mouseup', endSelectionCariKata);
+            gridEl.addEventListener('touchstart', startSelectionCariKata, { passive: false });
+            gridEl.addEventListener('touchmove', moveSelectionCariKata, { passive: false });
+            document.addEventListener('touchend', endSelectionCariKata);
+        }
+
+        function getCellFromEvent(e) {
+            const target = e.type.includes('touch') ? document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY) : e.target;
+            return target.closest('.grid-cell');
+        }
+
+        function startSelectionCariKata(e) {
+            e.preventDefault();
+            const cell = getCellFromEvent(e);
+            if (!cell) return;
+            cariKataState.isSelecting = true;
+            cariKataState.selectedCells = [cell];
+            cell.classList.add('selected');
+            clickSound();
+        }
+
+        function moveSelectionCariKata(e) {
+            if (!cariKataState.isSelecting) return;
+            e.preventDefault();
+            const cell = getCellFromEvent(e);
+            if (cell && !cariKataState.selectedCells.includes(cell)) {
+                // Logic to select cells in a straight line
+                const firstCell = cariKataState.selectedCells[0];
+                const r1 = parseInt(firstCell.dataset.r), c1 = parseInt(firstCell.dataset.c);
+                const r2 = parseInt(cell.dataset.r), c2 = parseInt(cell.dataset.c);
+                
+                const dr = Math.sign(r2 - r1), dc = Math.sign(c2 - c1);
+                const isStraightLine = (r1 === r2 || c1 === c2 || Math.abs(r1 - r2) === Math.abs(c1 - c2));
+
+                if (!isStraightLine) return;
+
+                // Clear previous selection except first cell
+                cariKataState.gridEl.querySelectorAll('.selected').forEach(c => c.classList.remove('selected'));
+                cariKataState.selectedCells = [firstCell];
+                firstCell.classList.add('selected');
+
+                let r = r1, c = c1;
+                while (r !== r2 || c !== c2) {
+                    r += dr; c += dc;
+                    const nextCell = cariKataState.gridEl.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+                    if (nextCell) {
+                        cariKataState.selectedCells.push(nextCell);
+                        nextCell.classList.add('selected');
+                    }
+                }
+            }
+        }
+
+        function endSelectionCariKata() {
+            if (!cariKataState.isSelecting) return;
+            cariKataState.isSelecting = false;
+            
+            const selectedWord = cariKataState.selectedCells.map(c => c.textContent).join('');
+            const reversedWord = selectedWord.split('').reverse().join('');
+
+            const wordToFind = cariKataState.words.find(w => !cariKataState.foundWords.includes(w) && (w === selectedWord || w === reversedWord));
+
+            if (wordToFind) {
+                correctSound();
+                cariKataState.foundWords.push(wordToFind);
+                cariKataState.selectedCells.forEach(c => c.classList.add('found'));
+                cariKataState.listEl.querySelector(`[data-word="${wordToFind}"]`).classList.add('found');
+                updateFoundCounterCariKata();
+                
+                if (cariKataState.foundWords.length === cariKataState.words.length) {
+                    winSound();
+                    showNotification(true, "Luar biasa! Semua kata telah ditemukan!", "Main Lagi", () => showPage('setupPageCariKata'));
+                }
+            }
+            
+            cariKataState.gridEl.querySelectorAll('.selected').forEach(c => c.classList.remove('selected'));
+            cariKataState.selectedCells = [];
+        }
+
+
+        // --- ACAK KATA GAME LOGIC ---
+        const acakKataState = {
+            words: [], currentWordIndex: 0, currentWord: '', scrambledWord: '', score: 0,
+            scoreDisplay: document.getElementById('scoreDisplayAcakKata'),
+            wordCounter: document.getElementById('wordCounterAcakKata'),
+            scrambledDisplay: document.getElementById('scrambledWordDisplay'),
+            guessInput: document.getElementById('guessInputAcakKata'),
+            checkBtn: document.getElementById('checkGuessBtnAcakKata'),
+            skipBtn: document.getElementById('skipBtnAcakKata')
+        };
+        
+        function startAcakKata() {
+            const rawWords = document.getElementById('wordInputAcakKata').value.split(/[\n,]/).map(w => w.trim().toUpperCase()).filter(w => w.length > 0 && /^[A-Z]+$/.test(w));
+            if (rawWords.length === 0) return;
+            Object.assign(acakKataState, { words: rawWords, currentWordIndex: 0, score: 0 });
+            showPage('gamePageAcakKata');
+            startNewRoundAcakKata();
+        }
+
+        function startNewRoundAcakKata() {
+            if (acakKataState.currentWordIndex >= acakKataState.words.length) {
+                showNotification(true, `Permainan selesai! Skor akhirmu: ${acakKataState.score}`, "Main Lagi", () => showPage('setupPageAcakKata'));
+                return;
+            }
+            acakKataState.currentWord = acakKataState.words[acakKataState.currentWordIndex];
+            
+            let shuffled = acakKataState.currentWord.split('');
+            do {
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+            } while (shuffled.join('') === acakKataState.currentWord && acakKataState.currentWord.length > 1);
+            acakKataState.scrambledWord = shuffled.join('');
+
+            acakKataState.scrambledDisplay.textContent = acakKataState.scrambledWord;
+            acakKataState.scoreDisplay.textContent = `Skor: ${acakKataState.score}`;
+            acakKataState.wordCounter.textContent = `Kata ${acakKataState.currentWordIndex + 1} dari ${acakKataState.words.length}`;
+            acakKataState.guessInput.value = '';
+            acakKataState.guessInput.focus();
+        }
+        
+        function checkGuessAcakKata() {
+            const guess = acakKataState.guessInput.value.trim().toUpperCase();
+            if (guess === acakKataState.currentWord) {
+                correctSound();
+                acakKataState.score += 10;
+                showNotification(true, "Jawabanmu Benar!", "Lanjut", () => {
+                    acakKataState.currentWordIndex++;
+                    startNewRoundAcakKata();
+                });
+            } else {
+                wrongSound();
+                acakKataState.guessInput.classList.add('border-red-500');
+                setTimeout(() => acakKataState.guessInput.classList.remove('border-red-500'), 500);
+                showNotification(false, "Jawaban salah, coba lagi!", "OK", () => acakKataState.guessInput.focus());
+            }
+        }
+        
+        acakKataState.checkBtn.addEventListener('click', checkGuessAcakKata);
+        acakKataState.guessInput.addEventListener('keyup', (e) => { if(e.key === 'Enter') checkGuessAcakKata(); });
+        acakKataState.skipBtn.addEventListener('click', () => {
+            showNotification(false, `Kata yang benar adalah: ${acakKataState.currentWord}`, "Lanjut", () => {
+                acakKataState.currentWordIndex++;
+                startNewRoundAcakKata();
+            });
+        });
+
+    </script>
+</body>
+</html>
+
